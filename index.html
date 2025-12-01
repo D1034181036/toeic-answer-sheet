@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>多益練習用答案卡</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+            
+            /* 補償固定按鈕組的高度，讓內容不被遮擋 */
+            padding-top: 80px; 
+            padding-bottom: 20px;
+            padding-left: 20px;
+            padding-right: 20px;
+        }
+        
+        /* 固定按鈕的外部容器 */
+        .fixed-controls-wrapper {
+            position: fixed; /* 將元素固定在視窗上 */
+            top: 0;
+            left: 0;
+            width: 100%; /* 佔滿整個寬度 */
+            padding: 10px 0;
+            background-color: white; /* 確保內容不會從下方透出 */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            z-index: 1000; /* 確保它在所有內容之上 */
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 0 30px 30px 30px; 
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 0; 
+            padding-top: 30px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .reset-btn {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .reset-btn:hover {
+            background-color: #c0392b;
+        }
+
+        .correction-btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .correction-btn:hover {
+            background-color: #2980b9;
+        }
+
+        .correction-btn.active {
+            background-color: #e67e22;
+        }
+
+        .correction-btn.active:hover {
+            background-color: #d35400;
+        }
+
+        .questions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, 230px);
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .question-item {
+            width: 230px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border: 1px solid #ddd;
+            padding: 10px 15px;
+            border-radius: 8px;
+            background-color: #fafafa;
+        }
+
+        .question-number {
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 16px;
+            min-width: 20px;
+        }
+
+        .options {
+            display: flex;
+            gap: 8px;
+        }
+
+        .option {
+            width: 35px;
+            height: 35px;
+            border: 2px solid #333;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-weight: bold;
+            color: #333;
+            transition: all 0.3s;
+            background-color: white;
+        }
+
+        .option:hover {
+            background-color: #e0e0e0;
+            transform: scale(1.1);
+        }
+
+        .option.selected {
+            background-color: #666;
+            color: white;
+            border-color: #666;
+        }
+
+        .option.correction {
+            background-color: #e74c3c;
+            color: white;
+            border-color: #e74c3c;
+        }
+        
+        /* 標題樣式 */
+        .part-title {
+            grid-column: 1 / -1; 
+            text-align: center;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #2980b9;
+            margin: 15px 0 5px 0;
+            padding: 5px;
+            border-bottom: 2px solid #3498db;
+        }
+    </style>
+</head>
+<body>
+    <div class="fixed-controls-wrapper">
+        <div class="button-group">
+            <button class="correction-btn" id="correctionBtn" onclick="toggleCorrectionMode()">訂正模式</button>
+            <button class="reset-btn" onclick="resetAll()">重置全部</button>
+        </div>
+    </div>
+    <div class="container">
+        <div class="header">
+            <h1>多益練習用答案卡</h1>
+            </div>
+        <div class="questions-grid" id="questionsGrid"></div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'answerSheet';
+        const CORRECTION_KEY = 'answerSheetCorrection';
+        const answers = {};
+        const corrections = {};
+        let correctionMode = false;
+
+        // 定義需要插入標題的題號和標題文字
+        const partMarkers = {
+            1: 'Part 1',
+            7: 'Part 2',
+            32: 'Part 3',
+            71: 'Part 4',
+            101: 'Part 5',
+            131: 'Part 6',
+            147: 'Part 7 單篇',
+            176: 'Part 7 多篇',
+        };
+
+        // 輔助函式: 建立並回傳標題元素
+        function createPartTitle(titleText) {
+            const titleDiv = document.createElement('div');
+            titleDiv.className = 'part-title';
+            titleDiv.textContent = titleText;
+            return titleDiv;
+        }
+
+        // 初始化答案卡
+        function initAnswerSheet() {
+            const grid = document.getElementById('questionsGrid');
+            
+            const savedAnswers = loadAnswers();
+            const savedCorrections = loadCorrections();
+            
+            for (let i = 1; i <= 200; i++) {
+                
+                if (partMarkers[i]) {
+                    const titleElement = createPartTitle(partMarkers[i]);
+                    grid.appendChild(titleElement);
+                }
+
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'question-item';
+                
+                const numberDiv = document.createElement('div');
+                numberDiv.className = 'question-number';
+                numberDiv.textContent = i;
+                
+                const optionsDiv = document.createElement('div');
+                optionsDiv.className = 'options';
+                
+                ['A', 'B', 'C', 'D'].forEach(option => {
+                    const optionBtn = document.createElement('div');
+                    optionBtn.className = 'option';
+                    optionBtn.textContent = option;
+                    optionBtn.dataset.question = i;
+                    optionBtn.dataset.option = option;
+                    
+                    if (savedAnswers[i] === option) {
+                        optionBtn.classList.add('selected');
+                        answers[i] = option;
+                    }
+                    
+                    if (savedCorrections[i] === option) {
+                        optionBtn.classList.add('correction');
+                        corrections[i] = option;
+                    }
+                    
+                    optionBtn.onclick = () => selectOption(i, option, optionBtn);
+                    optionsDiv.appendChild(optionBtn);
+                });
+                
+                questionDiv.appendChild(numberDiv);
+                questionDiv.appendChild(optionsDiv);
+                grid.appendChild(questionDiv);
+            }
+        }
+
+        // 選擇選項
+        function selectOption(questionNum, option, clickedBtn) {
+            const allOptions = document.querySelectorAll(`[data-question="${questionNum}"]`);
+            
+            if (correctionMode) {
+                // =======================================================
+                // 訂正模式:切換訂正標記
+                
+                // 新增邏輯: 如果點擊的是已選答案（selected）且沒有訂正標記，則清除該題的所有訂正。
+                if (clickedBtn.classList.contains('selected') && !clickedBtn.classList.contains('correction')) {
+                     // 找到該題所有有 correction 標記的選項並移除
+                     document.querySelectorAll(`[data-question="${questionNum}"].correction`).forEach(opt => {
+                         opt.classList.remove('correction');
+                     });
+                     // 從 corrections 物件中移除該題的紀錄
+                     delete corrections[questionNum];
+                     saveCorrections(); 
+                     return; // 完成操作並返回
+                }
+
+                if (clickedBtn.classList.contains('correction')) {
+                    // 如果已經是訂正答案,則取消選取
+                    clickedBtn.classList.remove('correction');
+                    delete corrections[questionNum];
+                } else {
+                    // 否則設為訂正答案
+                    allOptions.forEach(opt => opt.classList.remove('correction'));
+                    clickedBtn.classList.add('correction');
+                    corrections[questionNum] = option;
+                }
+                saveCorrections();
+                // =======================================================
+            } else {
+                // 一般模式:切換答案
+                
+                // 邏輯 1: 如果點擊的選項有訂正標記，移除它
+                if (clickedBtn.classList.contains('correction')) {
+                    clickedBtn.classList.remove('correction');
+                    delete corrections[questionNum];
+                }
+                
+                if (clickedBtn.classList.contains('selected')) {
+                    // 如果已經是選中答案,則取消選取
+                    clickedBtn.classList.remove('selected');
+                    delete answers[questionNum];
+                } else {
+                    // 否則設為選中答案
+                    allOptions.forEach(opt => opt.classList.remove('selected'));
+                    clickedBtn.classList.add('selected');
+                    answers[questionNum] = option;
+                    
+                    // 邏輯 2: 如果點擊了新的答案，並且該題有任何訂正標記，移除訂正。
+                    if (corrections[questionNum]) {
+                        delete corrections[questionNum];
+                        document.querySelectorAll(`[data-question="${questionNum}"].correction`).forEach(opt => {
+                            opt.classList.remove('correction');
+                        });
+                    }
+                }
+                // 在一般模式下，答案和訂正可能都被修改，因此都要儲存
+                saveAnswers();
+                saveCorrections(); 
+            }
+        }
+
+        // 切換訂正模式
+        function toggleCorrectionMode() {
+            correctionMode = !correctionMode;
+            const btn = document.getElementById('correctionBtn');
+            
+            if (correctionMode) {
+                btn.classList.add('active');
+                btn.textContent = '訂正模式 (開啟)';
+            } else {
+                btn.classList.remove('active');
+                btn.textContent = '訂正模式';
+            }
+        }
+
+        // 儲存答案到 localStorage
+        function saveAnswers() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(answers));
+        }
+
+        // 從 localStorage 載入答案
+        function loadAnswers() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            return saved ? JSON.parse(saved) : {};
+        }
+
+        // 儲存訂正到 localStorage
+        function saveCorrections() {
+            localStorage.setItem(CORRECTION_KEY, JSON.stringify(corrections));
+        }
+
+        // 從 localStorage 載入訂正
+        function loadCorrections() {
+            const saved = localStorage.getItem(CORRECTION_KEY);
+            return saved ? JSON.parse(saved) : {};
+        }
+
+        // 重置全部
+        function resetAll() {
+            if (confirm('確定要清除所有答案和訂正嗎？')) {
+                Object.keys(answers).forEach(key => delete answers[key]);
+                Object.keys(corrections).forEach(key => delete corrections[key]);
+                
+                localStorage.removeItem(STORAGE_KEY);
+                localStorage.removeItem(CORRECTION_KEY);
+                
+                document.querySelectorAll('.option.selected').forEach(opt => {
+                    opt.classList.remove('selected');
+                });
+                document.querySelectorAll('.option.correction').forEach(opt => {
+                    opt.classList.remove('correction');
+                });
+            }
+        }
+
+        // 頁面載入時初始化
+        window.onload = initAnswerSheet;
+    </script>
+</body>
+</html>
